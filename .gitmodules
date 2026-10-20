@@ -1,0 +1,6 @@
+[submodule "clone/artcraft"]
+	path = clone/artcraft
+	url = https://github.com/storytold/artcraft.git
+[submodule "clone/artcraftx"]
+	path = clone/artcraftx
+	url = https://github.com/storytold/artcraftx.git

@@ -1,0 +1,26 @@
+[package]
+name = "artcraft"
+description = "ArtCraft rebuilt in pure egui — an AI creative studio desktop app with no TypeScript and no webview, wired to the artcraft-proxy ZAI plugin"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "artcraft"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+base64.workspace = true
+# Same eframe/egui stack as the upstream `artcraft-native` client.
+eframe = { version = "0.36", default-features = false, features = ["default_fonts", "glow", "accesskit", "wayland", "x11", "persistence", "links"] }
+egui = "0.36"
+env_logger = "0.11"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+open = "5"
+reqwest = { version = "0.12", default-features = false, features = ["json", "blocking", "rustls-tls"] }
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true

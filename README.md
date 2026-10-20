@@ -1,0 +1,118 @@
+# ArtCraft — egui rebuild (pure Rust, no TypeScript)
+
+A full desktop **remake of [Storytold ArtCraft](https://github.com/storytold/artcraft) in [egui](https://github.com/emilk/egui)** — zero TypeScript, zero webview — plus a pure-Rust **`artcraft-proxy`** that connects the app to **ZAI sessions** (GLM chat + CogView image generation) so AI works out of the box.
+
+```
+┌─────────────────────┐   HTTP    ┌─────────────────────┐   HTTPS   ┌──────────────────┐
+│  apps/artcraft      │ ────────► │  apps/artcraft-proxy│ ────────► │  ZAI (Z.ai)      │
+│  egui desktop app   │ hardcoded │  axum plugin bridge │  Bearer   │  glm-4.6 (chat)  │
+│  (no TypeScript)    │ 127.0.0.1 │  sessions + mock    │  API key  │  cogview-4 (img) │
+└─────────────────────┘   :8787   └─────────────────────┘           └──────────────────┘
+```
+
+The upstream sources are vendored as git submodules for reference:
+
+- `clone/artcraft` — upstream ArtCraft (Tauri 2 + `artcraft-native` egui client + TS frontend) — MIT OR Apache-2.0
+- `clone/artcraftx` — companion pared-down client — unlicensed, reference only
+
+The egui rebuild mirrors `artcraft-native`'s brutalist theme 1:1 (near-black surfaces, `#2d81ff` brand accent, Inter/Archivo/Geist Mono variable fonts, 3 px control corners, 40 px custom title bar + 232 px sidebar + rounded content panel).
+
+## Repository layout
+
+```
+.
+├── Cargo.toml               # workspace: apps/artcraft + apps/artcraft-proxy
+├── apps/
+│   ├── artcraft/            # the egui desktop app (bin: artcraft)
+│   │   └── src/             #   app, shell, theme, pages (home/image/assistant/library/settings),
+│   │                        #   titlebar, lightbox, icons, widgets, proxy client, state
+│   └── artcraft-proxy/      # the ZAI plugin bridge (bin: artcraft-proxy)
+│       └── src/             #   axum routes, ZAI client, session store, mock engine
+├── clone/                   # upstream repos as git submodules (reference only)
+├── .github/workflows/
+│   ├── proxy.yml            # builds artcraft-proxy for Linux + Windows
+│   └── artcraft.yml         # builds the egui app for Windows
+└── README.md
+```
+
+## Quickstart
+
+```bash
+# 1. start the ZAI plugin bridge (defaults to http://0.0.0.0:8787)
+cargo run -p artcraft-proxy
+
+# 2. run the desktop app (another terminal)
+cargo run -p artcraft
+```
+
+Without configuration the proxy runs in **mock mode** (canned assistant replies + procedurally generated placeholder art), so everything is testable with no account. For real AI:
+
+```bash
+ZAI_API_KEY=sk-... cargo run -p artcraft-proxy     # live mode: GLM + CogView
+```
+
+### Hardcoded plugin connection details
+
+The egui app ships pointing at the proxy; the proxy ships pointing at ZAI:
+
+| Where | Constant | Value |
+|---|---|---|
+| `apps/artcraft/src/state.rs` | `DEFAULT_PROXY_URL` | `http://127.0.0.1:8787` |
+| `apps/artcraft-proxy/src/config.rs` | `DEFAULT_ZAI_BASE_URL` | `https://api.z.ai/api/paas/v4` |
+| 〃 | `DEFAULT_CHAT_MODEL` | `glm-4.6` |
+| 〃 | `DEFAULT_IMAGE_MODEL` | `cogview-4` |
+
+Every value has an environment override (`ZAI_API_KEY`, `ZAI_BASE_URL`, `ZAI_CHAT_MODEL`, `ZAI_IMAGE_MODEL`, `ARTCRAFT_PROXY_HOST`, `ARTCRAFT_PROXY_PORT`, `ARTCRAFT_PROXY_MOCK`, `ARTCRAFT_PROXY_DATA_DIR`).
+
+## The proxy API
+
+| Route | Purpose |
+|---|---|
+| `GET /health` | liveness + mode (`live`/`mock`) |
+| `GET /api/v1/config` | models, sizes, ZAI base URL, key presence |
+| `POST /api/v1/sessions` | create a ZAI chat session |
+| `GET /api/v1/sessions` | list sessions (auto-titled from first message) |
+| `GET/DELETE /api/v1/sessions/{id}` | fetch history / delete |
+| `POST /api/v1/sessions/{id}/chat` | chat on a session (history + system prompt sent every turn) |
+| `POST /api/v1/images` | text-to-image → base64 PNG (CogView) |
+| `POST /api/v1/chat/completions` | direct OpenAI-compatible completion |
+| `ANY /api/v1/openai/{*path}` | raw passthrough to `{ZAI_BASE_URL}/{path}` (streams) |
+
+Sessions persist to `apps/artcraft-proxy/data/sessions.json`; the egui app stores settings + the image library under `artcraft-data/`.
+
+## The egui app
+
+- **Home** — plugin status, quickstart, upstream info
+- **Create › Image** — prompt box with model/size/count pickers, Enter-to-generate, results feed, lightbox, images auto-saved to `artcraft-data/generated/`
+- **Create › Assistant** — GLM chat over proxy sessions (create/switch/delete/clear)
+- **Assets › Library** — every generated image on disk, lazy textures, reveal in Explorer
+- **System › Settings** — proxy URL (hardcoded default pre-filled), connection test, ZAI readout, session manager
+
+Custom frameless window with hand-painted title bar (drag, double-click maximize, min/max/close), hand-painted icon set, per-frame event polling of worker threads — no blocking on the UI thread.
+
+## Build & CI
+
+GitHub Actions builds release binaries on every push/PR (and attaches them to tag releases):
+
+| Workflow | Targets | Artifact |
+|---|---|---|
+| `.github/workflows/proxy.yml` | `ubuntu-latest` + `windows-latest` | `artcraft-proxy-linux-x86_64`, `artcraft-proxy-windows-x86_64.exe` |
+| `.github/workflows/artcraft.yml` | `windows-latest` | `artcraft-egui-windows-x64.zip` |
+
+Build locally:
+
+```bash
+cargo build --release -p artcraft-proxy   # linux + windows
+cargo build --release -p artcraft         # any desktop platform
+```
+
+## Security note
+
+A GitHub token was shared in the chat that produced this repository. **Revoke it** (GitHub → Settings → Developer settings → Personal access tokens) — no secret is stored in this repo, and CI needs none (public submodules + the default `GITHUB_TOKEN`).
+
+## License & attribution
+
+- This workspace: MIT OR Apache-2.0.
+- Theme, fonts and layout adapted from upstream `artcraft-native` (MIT OR Apache-2.0, © ArtCraft Team).
+- Fonts: Inter, Archivo, Geist Mono — SIL Open Font License (see `apps/artcraft/assets/fonts/OFL-*.txt`).
+- Upstream trademarks/logos are not used; the app icon is generated at runtime.
