@@ -30,15 +30,14 @@ The egui rebuild mirrors `artcraft-native`'s brutalist theme 1:1 (near-black sur
 │       └── src/             #   axum routes, ZAI client, session store, mock engine
 ├── clone/                   # upstream repos as git submodules (reference only)
 ├── .github/workflows/
-│   ├── proxy.yml            # builds artcraft-proxy for Linux + Windows
-│   └── artcraft.yml         # builds the egui app for Windows
+│   └── build.yml            # one run → proxy (Linux + Windows) + egui app (Windows)
 └── README.md
 ```
 
 ## Quickstart
 
 ```bash
-# 1. start the ZAI plugin bridge (defaults to http://0.0.0.0:8787)
+# 1. start the ZAI plugin bridge (defaults to http://127.0.0.1:8787)
 cargo run -p artcraft-proxy
 
 # 2. run the desktop app (another terminal)
@@ -62,7 +61,36 @@ The egui app ships pointing at the proxy; the proxy ships pointing at ZAI:
 | 〃 | `DEFAULT_CHAT_MODEL` | `glm-4.6` |
 | 〃 | `DEFAULT_IMAGE_MODEL` | `cogview-4` |
 
-Every value has an environment override (`ZAI_API_KEY`, `ZAI_BASE_URL`, `ZAI_CHAT_MODEL`, `ZAI_IMAGE_MODEL`, `ARTCRAFT_PROXY_HOST`, `ARTCRAFT_PROXY_PORT`, `ARTCRAFT_PROXY_MOCK`, `ARTCRAFT_PROXY_DATA_DIR`).
+Every value has an environment override (`ZAI_API_KEY`, `ZAI_BASE_URL`, `ZAI_CHAT_MODEL`, `ZAI_IMAGE_MODEL`, `ARTCRAFT_PROXY_HOST`, `ARTCRAFT_PROXY_PORT`, `ARTCRAFT_PROXY_MOCK`, `ARTCRAFT_PROXY_DATA_DIR`), and the binary takes CLI flags on top:
+
+```text
+artcraft-proxy [--host <addr>] [--port <n>] [--data-dir <dir>] [-h | --help]
+
+# examples
+artcraft-proxy.exe --port 8899          # run on another port (update the app: Settings → Proxy URL)
+artcraft-proxy.exe --host 0.0.0.0       # expose on your LAN instead of loopback
+artcraft-proxy.exe --help               # full help with env vars + Windows notes
+```
+
+### Windows: "os error 10013" when starting the proxy
+
+`10013` (WSAEACCES) means Windows refused the bind — almost always because the port landed inside a **Hyper-V / WinNAT reserved (excluded) range**, or a firewall/antivirus blocked the exe:
+
+```bat
+:: 1. see if your port is inside a reserved range
+netsh interface ipv4 show excludedportrange protocol=tcp
+
+:: 2. easiest fix — pick a port outside every reserved range
+artcraft-proxy-windows-x86_64.exe --port 8899
+
+:: 3. or release the dynamic reservations (Terminal as Administrator; restarts WinNAT)
+net stop winnat && net start winnat
+
+:: 4. port already used by another app (error 10048)?
+netstat -ano | findstr :8787
+```
+
+The proxy binds `127.0.0.1` by default (no firewall prompt, all the egui app needs). If you run it on a non-default port, point the app at it via **Settings → Proxy URL**.
 
 ## The proxy API
 
@@ -92,12 +120,11 @@ Custom frameless window with hand-painted title bar (drag, double-click maximize
 
 ## Build & CI
 
-GitHub Actions builds release binaries on every push/PR (and attaches them to tag releases):
+GitHub Actions builds release binaries on every push/PR (and attaches them to tag releases). One workflow → **all three artifacts in a single run summary**:
 
-| Workflow | Targets | Artifact |
+| Workflow | Targets | Artifacts |
 |---|---|---|
-| `.github/workflows/proxy.yml` | `ubuntu-latest` + `windows-latest` | `artcraft-proxy-linux-x86_64`, `artcraft-proxy-windows-x86_64.exe` |
-| `.github/workflows/artcraft.yml` | `windows-latest` | `artcraft-egui-windows-x64.zip` |
+| `.github/workflows/build.yml` | `ubuntu-latest` + `windows-latest` ×2 jobs | `artcraft-proxy-linux-x86_64`, `artcraft-proxy-windows-x86_64`, `artcraft-egui-windows-x64` |
 
 Build locally:
 
