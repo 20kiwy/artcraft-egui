@@ -92,6 +92,15 @@ netstat -ano | findstr :8787
 
 The proxy binds `127.0.0.1` by default (no firewall prompt, all the egui app needs). If you run it on a non-default port, point the app at it via **Settings → Proxy URL**.
 
+### Hosting the proxy behind the sandbox preview URL
+
+The hosted sandbox only exposes port 3000, so the Next.js app bridges the proxy for you:
+
+- `src/instrumentation.ts` + `src/lib/artcraft-proxy-child.ts` spawn `artcraft-proxy` as a **child of the Next.js server** (watchdog respawns it every 5 s if it exits).
+- `src/app/health/route.ts` and `src/app/api/v1/[...path]/route.ts` relay `/health` + `/api/v1/*` to `127.0.0.1:8787` (method/query/body preserved, streaming pass-through).
+
+Result: paste the **preview URL** (the HTTPS URL from the preview panel / "Open in New Tab", no trailing slash needed) into the egui app's **Settings → Proxy URL** and the hosted proxy answers — mock mode unless a `ZAI_API_KEY` is set in the sandbox environment. The override origin can be changed with `ARTCRAFT_PROXY_ORIGIN`.
+
 ## The proxy API
 
 | Route | Purpose |
