@@ -60,9 +60,22 @@ impl ArtcraftApp {
         ui.add_space(6.0);
         match &self.cfg {
           Some(cfg) => {
+            let backend = cfg.backend.clone().unwrap_or_default();
             widgets::kv(ui, "mode", &cfg.mode, if cfg.mode == "live" { theme::OK } else { theme::WARN });
             widgets::kv(ui, "zai base url", &cfg.zai_base_url, theme::MUTED);
-            widgets::kv(ui, "api key", if cfg.api_key_set { "configured" } else { "missing — mock mode" }, if cfg.api_key_set { theme::OK } else { theme::WARN });
+            // Credentials live on the proxy side. A bridge backend means a
+            // server holds the key — the desktop app intentionally has none.
+            let (key_text, key_color) = if cfg.api_key_set {
+              ("configured (on the proxy)", theme::OK)
+            } else if backend.contains("bridge") {
+              ("none — held server-side by the ZAI bridge", theme::OK)
+            } else {
+              ("missing — mock mode", theme::WARN)
+            };
+            widgets::kv(ui, "api key", key_text, key_color);
+            if !backend.is_empty() {
+              widgets::kv(ui, "backend", &backend, theme::MUTED);
+            }
             widgets::kv(ui, "chat model", &cfg.chat_model, theme::MUTED);
             widgets::kv(ui, "image model", &cfg.image_model, theme::MUTED);
             ui.add_space(4.0);

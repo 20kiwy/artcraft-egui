@@ -59,7 +59,9 @@ async fn main() -> anyhow::Result<()> {
     settings.image_model,
   );
   if settings.mock {
-    tracing::warn!("no ZAI_API_KEY set — running in MOCK mode (canned replies + generated placeholder images)");
+    tracing::warn!("no ZAI_API_KEY and no bridge URL — running in MOCK mode (canned replies + generated placeholder images)");
+  } else if settings.api_key.is_none() {
+    tracing::info!("no ZAI_API_KEY set — real models answer via the server-side ZAI bridge ({})", settings.backend());
   }
   if bound != format!("127.0.0.1:{}", config::DEFAULT_PORT) {
     tracing::info!(

@@ -1,7 +1,9 @@
-//! Image studio: results feed + the docked prompt box (model, size, count,
-//! Enter-to-generate), mirroring the upstream create-image page.
+//! Image studio: the results feed + the prompt composer DOCKED to the bottom
+//! of the page (a bottom panel, like the TypeScript app's create page) so the
+//! text area is always visible. Model / size / count pickers and
+//! Enter-to-generate included.
 
-use egui::{CornerRadius, FontId, Sense, Stroke, StrokeKind, vec2};
+use egui::{CornerRadius, FontId, Margin, Sense, Stroke, StrokeKind, vec2};
 
 use crate::app::ArtcraftApp;
 use crate::icons::{self, Icon};
@@ -10,7 +12,80 @@ use crate::widgets;
 
 impl ArtcraftApp {
   pub(crate) fn show_image(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-    // ---- results feed ----
+    // ---- docked composer -----------------------------------------------
+    // A bottom panel registered BEFORE the feed: it reserves the bottom of
+    // the page for the text area, so the composer can never be pushed
+    // off-screen (this used to be appended after the ScrollArea, which
+    // clipped it below the fold — the "where is the text area" bug).
+    egui::Panel::bottom("image-composer")
+      .resizable(false)
+      .frame(egui::Frame::NONE.outer_margin(Margin::same(8)))
+      .show(ui, |ui| {
+        widgets::prompt_box(ui, |ui| {
+          let resp = egui::TextEdit::multiline(&mut self.img_prompt)
+            .hint_text("Describe the image you want to craft…  (Enter to generate, Shift+Enter for a new line)")
+            .desired_rows(3)
+            .desired_width(ui.available_width())
+            .frame(egui::Frame::NONE)
+            .font(FontId::new(15.0, theme::medium()))
+            .show(ui);
+          if self.focus_composer {
+            self.focus_composer = false;
+            resp.response.request_focus();
+          }
+          let enter = resp.response.lost_focus()
+            && ui.input(|i| i.key_pressed(egui::Key::Enter))
+            && !ui.input(|i| i.modifiers.shift);
+          ui.add_space(6.0);
+          ui.horizontal(|ui| {
+            // Model picker.
+            let models = self.cfg.as_ref().map(|c| c.image_models.clone()).unwrap_or_else(|| vec!["cogview-4".into(), "cogview-3-flash".into()]);
+            let selected_model = self.img_model.clone().unwrap_or_else(|| models.first().cloned().unwrap_or_default());
+            egui::ComboBox::from_id_salt("img-model")
+              .selected_text(&selected_model)
+              .width(150.0)
+              .show_ui(ui, |ui| {
+                for m in &models {
+                  ui.selectable_value(&mut self.img_model, Some(m.clone()), m);
+                }
+              });
+            // Size picker.
+            let sizes = self.cfg.as_ref().map(|c| c.image_sizes.clone()).unwrap_or_else(|| vec!["1024x1024".into(), "1152x896".into(), "1344x768".into(), "896x1152".into(), "768x1344".into()]);
+            egui::ComboBox::from_id_salt("img-size")
+              .selected_text(&self.img_size)
+              .width(110.0)
+              .show_ui(ui, |ui| {
+                for s in &sizes {
+                  ui.selectable_value(&mut self.img_size, s.clone(), s);
+                }
+              });
+            // Count picker.
+            egui::ComboBox::from_id_salt("img-count")
+              .selected_text(format!("{}×", self.img_count))
+              .width(64.0)
+              .show_ui(ui, |ui| {
+                for n in 1..=4usize {
+                  ui.selectable_value(&mut self.img_count, n, format!("{n}×"));
+                }
+              });
+
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+              if self.img_busy {
+                ui.add(egui::Spinner::new().size(16.0));
+                ui.add_space(6.0);
+                widgets::hud(ui, "crafting", theme::MUTED);
+              } else {
+                let gen = widgets::primary(ui, Some(Icon::Wand), "Generate");
+                if gen.clicked() || enter {
+                  self.generate_images(ctx);
+                }
+              }
+            });
+          });
+        });
+      });
+
+    // ---- results feed (fills everything above the composer) -------------
     egui::ScrollArea::vertical().auto_shrink([false, false]).id_salt("image-feed").show(ui, |ui| {
       if self.feed.is_empty() && !self.img_busy {
         ui.add_space(48.0);
@@ -44,67 +119,6 @@ impl ArtcraftApp {
         });
       }
       ui.add_space(12.0);
-    });
-
-    // ---- docked prompt box ----
-    ui.add_space(4.0);
-    widgets::prompt_box(ui, |ui| {
-      let resp = egui::TextEdit::multiline(&mut self.img_prompt)
-        .hint_text("Describe the image you want to craft…")
-        .desired_rows(3)
-        .desired_width(ui.available_width())
-        .frame(egui::Frame::NONE)
-        .font(FontId::new(15.0, theme::medium()))
-        .show(ui);
-      let enter = resp.response.lost_focus()
-        && ui.input(|i| i.key_pressed(egui::Key::Enter))
-        && !ui.input(|i| i.modifiers.shift);
-      ui.add_space(6.0);
-      ui.horizontal(|ui| {
-        // Model picker.
-        let models = self.cfg.as_ref().map(|c| c.image_models.clone()).unwrap_or_else(|| vec!["cogview-4".into(), "cogview-3-flash".into()]);
-        let selected_model = self.img_model.clone().unwrap_or_else(|| models.first().cloned().unwrap_or_default());
-        egui::ComboBox::from_id_salt("img-model")
-          .selected_text(&selected_model)
-          .width(170.0)
-          .show_ui(ui, |ui| {
-            for m in &models {
-              ui.selectable_value(&mut self.img_model, Some(m.clone()), m);
-            }
-          });
-        // Size picker.
-        let sizes = self.cfg.as_ref().map(|c| c.image_sizes.clone()).unwrap_or_else(|| vec!["1024x1024".into(), "1152x896".into(), "1344x768".into(), "896x1152".into(), "768x1344".into()]);
-        egui::ComboBox::from_id_salt("img-size")
-          .selected_text(&self.img_size)
-          .width(120.0)
-          .show_ui(ui, |ui| {
-            for s in &sizes {
-              ui.selectable_value(&mut self.img_size, s.clone(), s);
-            }
-          });
-        // Count picker.
-        egui::ComboBox::from_id_salt("img-count")
-          .selected_text(format!("{}×", self.img_count))
-          .width(70.0)
-          .show_ui(ui, |ui| {
-            for n in 1..=4usize {
-              ui.selectable_value(&mut self.img_count, n, format!("{n}×"));
-            }
-          });
-
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-          if self.img_busy {
-            ui.add(egui::Spinner::new().size(16.0));
-            ui.add_space(6.0);
-            widgets::hud(ui, "crafting", theme::MUTED);
-          } else {
-            let gen = widgets::primary(ui, Some(Icon::Wand), "Generate");
-            if gen.clicked() || enter {
-              self.generate_images(ctx);
-            }
-          }
-        });
-      });
     });
   }
 

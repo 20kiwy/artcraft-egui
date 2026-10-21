@@ -16,6 +16,8 @@ pub struct Health {
 #[derive(Clone, Debug, Deserialize)]
 pub struct ConfigInfo {
   pub mode: String,
+  #[serde(default)]
+  pub backend: Option<String>,
   pub zai_base_url: String,
   pub api_key_set: bool,
   pub chat_model: String,

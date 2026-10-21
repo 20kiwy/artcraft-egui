@@ -58,6 +58,7 @@ async fn health(State(st): State<AppState>) -> Json<Value> {
 async fn config(State(st): State<AppState>) -> Json<Value> {
   Json(json!({
     "mode": st.settings.mode(),
+    "backend": st.settings.backend(),
     "zai_base_url": st.settings.zai_base_url,
     "api_key_set": st.settings.api_key.is_some(),
     "chat_model": st.settings.chat_model,

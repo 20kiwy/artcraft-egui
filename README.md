@@ -44,10 +44,21 @@ cargo run -p artcraft-proxy
 cargo run -p artcraft
 ```
 
-Without configuration the proxy runs in **mock mode** (canned assistant replies + procedurally generated placeholder art), so everything is testable with no account. For real AI:
+Without configuration the proxy runs in **mock mode** (canned assistant replies + procedurally generated placeholder art), so everything is testable with no account. For real AI there are three paths, in order of preference:
 
 ```bash
+# 1. direct: a Z.ai open-platform key on the proxy
 ZAI_API_KEY=sk-... cargo run -p artcraft-proxy     # live mode: GLM + CogView
+
+# 2. bridge: a server holds the credentials, the desktop app never sees a key
+#    (any service exposing POST /api/zai/chat {messages} and
+#     POST /api/zai/image {prompt,size} -> {image_base64})
+cargo run -p artcraft-proxy -- --bridge-url https://my-server.example
+
+# 3. hosted backend: in the ArtCraft sandbox deployment the Next.js server
+#    itself implements the whole artcraft-proxy contract with server-side
+#    credentials — paste the preview URL into the app (Settings → Proxy URL)
+#    and AI just works, no API key, no local proxy needed.
 ```
 
 ### Hardcoded plugin connection details
@@ -61,14 +72,15 @@ The egui app ships pointing at the proxy; the proxy ships pointing at ZAI:
 | 〃 | `DEFAULT_CHAT_MODEL` | `glm-4.6` |
 | 〃 | `DEFAULT_IMAGE_MODEL` | `cogview-4` |
 
-Every value has an environment override (`ZAI_API_KEY`, `ZAI_BASE_URL`, `ZAI_CHAT_MODEL`, `ZAI_IMAGE_MODEL`, `ARTCRAFT_PROXY_HOST`, `ARTCRAFT_PROXY_PORT`, `ARTCRAFT_PROXY_MOCK`, `ARTCRAFT_PROXY_DATA_DIR`), and the binary takes CLI flags on top:
+Every value has an environment override (`ZAI_API_KEY`, `ZAI_BASE_URL`, `ZAI_CHAT_MODEL`, `ZAI_IMAGE_MODEL`, `ARTCRAFT_BRIDGE_URL`, `ARTCRAFT_PROXY_HOST`, `ARTCRAFT_PROXY_PORT`, `ARTCRAFT_PROXY_MOCK`, `ARTCRAFT_PROXY_DATA_DIR`), and the binary takes CLI flags on top:
 
 ```text
-artcraft-proxy [--host <addr>] [--port <n>] [--data-dir <dir>] [-h | --help]
+artcraft-proxy [--host <addr>] [--port <n>] [--data-dir <dir>] [--bridge-url <url>] [-h | --help]
 
 # examples
 artcraft-proxy.exe --port 8899          # run on another port (update the app: Settings → Proxy URL)
 artcraft-proxy.exe --host 0.0.0.0       # expose on your LAN instead of loopback
+artcraft-proxy.exe --bridge-url https://my-server.example   # live via a credential-holding bridge
 artcraft-proxy.exe --help               # full help with env vars + Windows notes
 ```
 
@@ -119,11 +131,13 @@ Sessions persist to `apps/artcraft-proxy/data/sessions.json`; the egui app store
 
 ## The egui app
 
-- **Home** — plugin status, quickstart, upstream info
-- **Create › Image** — prompt box with model/size/count pickers, Enter-to-generate, results feed, lightbox, images auto-saved to `artcraft-data/generated/`
-- **Create › Assistant** — GLM chat over proxy sessions (create/switch/delete/clear)
+- **Home** — the TypeScript app's landing: a big centered "describe what you want to create" composer with **Image / Chat** mode chips (Enter routes into the right studio and fires the request), plus plugin status, quickstart, upstream info
+- **Create › Image** — the prompt composer **docked to the bottom of the page** (always visible), model/size/count pickers, Enter-to-generate, results feed, lightbox, images auto-saved to `artcraft-data/generated/`
+- **Create › Assistant** — GLM chat over proxy sessions (create/switch/delete/clear), composer docked to the bottom, bubbles wrap and hug the text
 - **Assets › Library** — every generated image on disk, lazy textures, reveal in Explorer
-- **System › Settings** — proxy URL (hardcoded default pre-filled), connection test, ZAI readout, session manager
+- **System › Settings** — proxy URL (hardcoded default pre-filled), connection test, ZAI readout (mode / backend / where the key lives), session manager
+
+The app self-heals across backends: switching the Proxy URL drops the stale session id and a vanished session is recreated transparently on the next message.
 
 Custom frameless window with hand-painted title bar (drag, double-click maximize, min/max/close), hand-painted icon set, per-frame event polling of worker threads — no blocking on the UI thread.
 

@@ -53,7 +53,14 @@ if (!bin) {
       const child = spawn(
         bin,
         ['--host', '127.0.0.1', '--port', String(port), '--data-dir', path.join(root, 'apps/artcraft-proxy/data')],
-        { stdio: ['ignore', logFd, logFd], env: process.env },
+        {
+          stdio: ['ignore', logFd, logFd],
+          // Live mode without a key: the proxy calls this very server's
+          // /api/zai/* routes, which authenticate with the platform
+          // integration server-side (z-ai-web-dev-sdk). Neither the desktop
+          // app nor the proxy ever sees a credential.
+          env: { ...process.env, ARTCRAFT_BRIDGE_URL: process.env.ARTCRAFT_BRIDGE_URL ?? 'http://127.0.0.1:3000' },
+        },
       );
       child.on('error', (err) => console.error('[artcraft-bridge] spawn failed:', err.message));
       child.on('exit', (code, signal) =>

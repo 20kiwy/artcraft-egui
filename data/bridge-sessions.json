@@ -56,5 +56,76 @@
         "ts": 1792583905
       }
     ]
+  },
+  {
+    "id": "83986782-cb80-4768-9432-71e0f5858418",
+    "title": "New chat",
+    "created_at": 1792597342,
+    "updated_at": 1792597342,
+    "messages": []
+  },
+  {
+    "id": "06742953-2aeb-4fcc-bdf4-27415487000d",
+    "title": "New chat",
+    "created_at": 1792597343,
+    "updated_at": 1792597343,
+    "messages": []
+  },
+  {
+    "id": "468b6f35-9d89-4fea-8183-b75cf7370bdc",
+    "title": "New chat",
+    "created_at": 1792597551,
+    "updated_at": 1792597551,
+    "messages": []
+  },
+  {
+    "id": "cf4c785c-f858-451d-a5a4-382f1da24397",
+    "title": "New chat",
+    "created_at": 1792597708,
+    "updated_at": 1792597708,
+    "messages": []
+  },
+  {
+    "id": "3766afcc-5e1c-42cb-b158-abf8e5cd263f",
+    "title": "New chat",
+    "created_at": 1792598213,
+    "updated_at": 1792598213,
+    "messages": []
+  },
+  {
+    "id": "431a95bf-b8fb-42b3-b54b-cb0fa02d1503",
+    "title": "In one sentence, what is ArtCraft?",
+    "created_at": 1792598213,
+    "updated_at": 1792598213,
+    "messages": [
+      {
+        "role": "user",
+        "content": "In one sentence, what is ArtCraft?",
+        "ts": 1792598213
+      },
+      {
+        "role": "assistant",
+        "content": "ArtCraft is an AI-powered creative IDE built in Rust with egui, designed to help artists brainstorm ideas and generate visual, audio, and video content.",
+        "ts": 1792598213
+      }
+    ]
+  },
+  {
+    "id": "184039c9-306d-4fde-8620-ddfe3576c575",
+    "title": "Say hello to the painter using this app, one sh…",
+    "created_at": 1792599424,
+    "updated_at": 1792599425,
+    "messages": [
+      {
+        "role": "user",
+        "content": "Say hello to the painter using this app, one short sentence",
+        "ts": 1792599424
+      },
+      {
+        "role": "assistant",
+        "content": "Hello, artist! Let's bring your vision to life.",
+        "ts": 1792599425
+      }
+    ]
   }
 ]

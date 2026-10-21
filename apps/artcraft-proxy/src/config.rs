@@ -34,23 +34,30 @@ pub const HELP_TEXT: &str = "\
 artcraft-proxy — ArtCraft AI plugin bridge (ZAI sessions -> local HTTP)
 
 The ArtCraft egui app expects this proxy at http://127.0.0.1:8787 (change it in
-the app: Settings -> Proxy URL). Without a ZAI_API_KEY the proxy runs in MOCK
-mode (canned replies + placeholder images) so you can test the app offline.
+the app: Settings -> Proxy URL). Live modes, in order of preference:
+  1. ZAI_API_KEY set        -> calls api.z.ai directly
+  2. --bridge-url set       -> a server-side ZAI bridge answers with real
+     GLM/CogView models and holds the credentials (the desktop app and the
+     proxy never see a key)
+With neither, the proxy runs in MOCK mode (canned replies + placeholder
+images) so you can test the app offline.
 
 Usage:
   artcraft-proxy [options]
 
 Options:
-  --host <addr>      Address to bind          (default: 127.0.0.1)
-  --port <number>    Port to bind            (default: 8787)
-  --data-dir <dir>   Session storage folder  (default: data)
-  -h, --help         Show this help and exit
+  --host <addr>        Address to bind          (default: 127.0.0.1)
+  --port <number>      Port to bind            (default: 8787)
+  --data-dir <dir>     Session storage folder  (default: data)
+  --bridge-url <url>   Server-side ZAI bridge base URL (live mode without a key)
+  -h, --help           Show this help and exit
 
 Environment overrides:
-  ZAI_API_KEY             Z.ai API key -> live mode (else mock mode)
+  ZAI_API_KEY             Z.ai API key -> live mode
   ZAI_BASE_URL            default: https://api.z.ai/api/paas/v4
   ZAI_CHAT_MODEL          default: glm-4.6
   ZAI_IMAGE_MODEL         default: cogview-4
+  ARTCRAFT_BRIDGE_URL     same as --bridge-url
   ARTCRAFT_PROXY_HOST     same as --host
   ARTCRAFT_PROXY_PORT     same as --port
   ARTCRAFT_PROXY_DATA_DIR same as --data-dir
@@ -68,6 +75,7 @@ pub struct CliArgs {
   pub host: Option<String>,
   pub port: Option<u16>,
   pub data_dir: Option<String>,
+  pub bridge_url: Option<String>,
 }
 
 impl CliArgs {
@@ -92,6 +100,7 @@ impl CliArgs {
           })?);
         }
         "--data-dir" => args.data_dir = Some(take_value(&mut iter, inline, "--data-dir")?),
+        "--bridge-url" => args.bridge_url = Some(take_value(&mut iter, inline, "--bridge-url")?),
         other => {
           return Err(format!(
             "unknown argument: {other}\n\n{HELP_TEXT}"
@@ -117,6 +126,9 @@ pub struct Settings {
   pub port: u16,
   pub zai_base_url: String,
   pub api_key: Option<String>,
+  /// Server-side ZAI bridge (e.g. the sandbox's Next.js routes): real GLM /
+  /// CogView answers without this proxy holding any credential.
+  pub bridge_url: Option<String>,
   pub chat_model: String,
   pub image_model: String,
   pub mock: bool,
@@ -131,15 +143,20 @@ impl Settings {
   /// [`Settings::apply_cli`].
   pub fn from_env() -> Self {
     let api_key = std::env::var("ZAI_API_KEY").ok().map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
+    let bridge_url = std::env::var("ARTCRAFT_BRIDGE_URL")
+      .ok()
+      .map(|s| s.trim().trim_end_matches('/').to_owned())
+      .filter(|s| !s.is_empty());
     let force_mock = std::env::var("ARTCRAFT_PROXY_MOCK")
       .map(|v| matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
       .unwrap_or(false);
-    let mock = force_mock || api_key.is_none();
+    let mock = force_mock || (api_key.is_none() && bridge_url.is_none());
     Self {
       host: env_or("ARTCRAFT_PROXY_HOST", DEFAULT_HOST),
       port: env_or("ARTCRAFT_PROXY_PORT", &DEFAULT_PORT.to_string()).parse().unwrap_or(DEFAULT_PORT),
       zai_base_url: env_or("ZAI_BASE_URL", DEFAULT_ZAI_BASE_URL).trim_end_matches('/').to_owned(),
       api_key,
+      bridge_url,
       chat_model: env_or("ZAI_CHAT_MODEL", DEFAULT_CHAT_MODEL),
       image_model: env_or("ZAI_IMAGE_MODEL", DEFAULT_IMAGE_MODEL),
       mock,
@@ -158,11 +175,30 @@ impl Settings {
     if let Some(d) = &cli.data_dir {
       self.data_dir = d.clone();
     }
+    if let Some(b) = &cli.bridge_url {
+      self.bridge_url = Some(b.trim().trim_end_matches('/').to_owned()).filter(|s| !s.is_empty());
+    }
+    // Re-evaluate after CLI overrides: a bridge flag upgrades mock to live.
+    if self.api_key.is_none() && self.bridge_url.is_some() {
+      self.mock = false;
+    }
   }
 
-  /// `"live"` when a real ZAI key is configured, `"mock"` otherwise.
+  /// `"live"` when real models answer (ZAI key or server-side bridge),
+  /// `"mock"` otherwise.
   pub fn mode(&self) -> &'static str {
     if self.mock { "mock" } else { "live" }
+  }
+
+  /// How requests reach the models (for the config endpoint and logs).
+  pub fn backend(&self) -> &'static str {
+    if self.api_key.is_some() {
+      "zai-direct"
+    } else if self.bridge_url.is_some() {
+      "zai-bridge"
+    } else {
+      "mock"
+    }
   }
 }
 

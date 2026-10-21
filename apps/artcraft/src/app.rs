@@ -44,6 +44,13 @@ pub struct ArtcraftApp {
   // Assistant
   pub(crate) asst: AssistantState,
 
+  // Home hero composer (TypeScript-style landing prompt)
+  pub(crate) home_prompt: String,
+  /// true → the hero composer crafts an Image, false → it chats.
+  pub(crate) home_image_mode: bool,
+  /// One-shot: focus the page composer after routing from Home.
+  pub(crate) focus_composer: bool,
+
   // Library
   pub(crate) library: Vec<LibraryEntry>,
   pub(crate) tex_cache: HashMap<String, TextureHandle>,
@@ -122,6 +129,9 @@ impl ArtcraftApp {
       img_busy: false,
       feed: Vec::new(),
       asst: AssistantState { sessions: Vec::new(), active: None, lines: Vec::new(), draft: String::new(), busy: false },
+      home_prompt: String::new(),
+      home_image_mode: true,
+      focus_composer: false,
       library,
       tex_cache: HashMap::new(),
       lightbox: None,
@@ -295,6 +305,10 @@ impl ArtcraftApp {
     self.draft_proxy_url = self.settings.proxy_url.clone();
     self.conn = ConnState::Checking;
     self.cfg = None;
+    // The new backend has a different session space — drop the stale id so
+    // the next message starts a fresh chat there (a kept id 404s).
+    self.asst.active = None;
+    self.asst.lines.clear();
     self.queue_health();
     self.queue_config();
     self.queue_sessions();
@@ -341,14 +355,28 @@ impl ArtcraftApp {
     let session = self.asst.active.clone();
     state::spawn_event(&self.tx, move || {
       // No session yet → the worker creates one, then chats on it.
-      let session = match session {
+      let mut session = match session {
         Some(s) => s,
         None => match cl.create_session() {
           Ok(s) => s,
           Err(e) => return Event::Chat(Err(e.to_string())),
         },
       };
-      Event::Chat(cl.chat(&session, &msg, None).map_err(|e| e.to_string()))
+      match cl.chat(&session, &msg, None) {
+        Ok(rep) => Event::Chat(Ok(rep)),
+        // Self-heal: the stored session can vanish (proxy data dir cleared,
+        // or the proxy URL was switched to another backend). Start fresh once.
+        Err(first) => match cl.create_session() {
+          Ok(s) => {
+            session = s;
+            match cl.chat(&session, &msg, None) {
+              Ok(rep) => Event::Chat(Ok(rep)),
+              Err(e) => Event::Chat(Err(format!("{e} (after session recreate; first error: {first})"))),
+            }
+          },
+          Err(e) => Event::Chat(Err(format!("{first}; also failed to recreate session: {e}"))),
+        },
+      }
     });
     ctx.request_repaint_after(Duration::from_millis(120));
   }
@@ -433,6 +461,8 @@ impl ArtcraftApp {
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, page.label()));
     if resp.clicked() {
       self.page = page;
+      // Landing on a studio page should put the cursor in its composer.
+      self.focus_composer = true;
     }
     if resp.hovered() {
       ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
@@ -474,7 +504,7 @@ impl ArtcraftApp {
               .show(ui, |ui| self.header_inner(ui));
             egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| {
               match self.page {
-                Page::Home => self.show_home(ui),
+                Page::Home => self.show_home(ui, &ctx),
                 Page::CreateImage => self.show_image(ui, &ctx),
                 Page::Assistant => self.show_assistant(ui, &ctx),
                 Page::Library => self.show_library(ui),

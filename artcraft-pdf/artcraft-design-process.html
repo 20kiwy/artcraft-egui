@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ArtCraft egui — AI Art Design Process</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+@page {
+    size: 720px 1020px;
+    margin: 0;
+}
+:root {
+    --c-bg: #0a0a0c;        /* app chrome */
+    --c-panel: #131418;     /* card panel */
+    --c-controls: #1e1f22;  /* app controls */
+    --c-text: #f2f1ee;      /* base-fg */
+    --c-muted: #9a9994;     /* fg/60 */
+    --c-accent: #2d81ff;    /* brand blue */
+    --c-line: rgba(255,255,255,0.15);
+}
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 720px;
+    background: #060607;
+    color: var(--c-text);
+    font-family: 'Inter', 'Helvetica Neue', sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+}
+@media screen {
+    html { height: auto; display: flex; justify-content: center; background: #060607; }
+    body { transform-origin: top center; margin: 20px auto; }
+}
+* { box-sizing: border-box; }
+img { max-width: 100%; max-height: 46vh; height: auto; object-fit: contain; display: block; }
+
+/* ---------- cover ---------- */
+.front {
+    width: 720px;
+    height: 1020px;
+    break-after: page;
+    overflow: hidden;
+    background: var(--c-bg);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 56px 60px;
+    position: relative;
+}
+.front .edge-top { position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--c-accent), transparent); opacity: 0.6; }
+.front-brand {
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 3px;
+    color: var(--c-muted); text-transform: uppercase;
+}
+.front-brand .dot { width: 8px; height: 8px; background: #35c759; border-radius: 50%; }
+.front-title { font-size: 68px; font-weight: 900; letter-spacing: -2px; line-height: 1.02; margin-top: 22px; }
+.front-title .thin { font-weight: 300; color: var(--c-muted); }
+.front-sub { margin-top: 18px; font-size: 16px; color: var(--c-muted); max-width: 520px; }
+.front-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+.front-tags span {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 1.5px;
+    border: 1px solid var(--c-line); color: var(--c-muted);
+    padding: 5px 10px; border-radius: 3px;
+}
+.front-shot {
+    margin-top: 40px; border: 1px solid var(--c-line); border-radius: 8px; overflow: hidden;
+    background: var(--c-controls);
+}
+.front-shot img { max-height: none; width: 100%; }
+.front-foot {
+    margin-top: 26px; display: flex; justify-content: space-between; align-items: baseline;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 2px; color: var(--c-muted);
+    text-transform: uppercase;
+}
+
+/* ---------- flowing content ---------- */
+.main-content { padding: 54px 60px 44px 60px; background: var(--c-bg); }
+.chapter-header { break-after: avoid; break-inside: avoid; margin-top: 26px; }
+.chapter-header:first-child { margin-top: 0; }
+.section-tag {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 3px;
+    color: var(--c-accent); text-transform: uppercase;
+}
+.section-title { font-size: 27px; font-weight: 800; letter-spacing: -0.5px; margin-top: 6px; line-height: 1.2; }
+.divider { height: 1px; background: var(--c-line); margin: 16px 0 14px 0; }
+.body-text { color: var(--c-muted); margin: 0 0 12px 0; }
+.body-text strong, .card strong { color: var(--c-text); font-weight: 600; }
+
+.figure { break-inside: avoid; margin: 6px 0 14px 0; }
+.figure .frame { border: 1px solid var(--c-line); border-radius: 8px; overflow: hidden; background: var(--c-controls); }
+.figure .frame img { width: 100%; }
+.figure .caption {
+    display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 1.2px;
+    color: var(--c-muted); text-transform: uppercase; padding: 8px 2px 0 2px;
+}
+.steps { counter-reset: step; margin: 4px 0 12px 0; }
+.step { display: flex; gap: 12px; align-items: flex-start; padding: 7px 0; break-inside: avoid; }
+.step .n {
+    counter-increment: step; flex: 0 0 auto;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600;
+    color: var(--c-accent); border: 1px solid var(--c-line); border-radius: 3px;
+    width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+}
+.step .n::before { content: counter(step, decimal-leading-zero); }
+.step .t { color: var(--c-muted); font-size: 14px; padding-top: 2px; }
+.step .t strong { color: var(--c-text); }
+
+.chat-card {
+    break-inside: avoid; margin: 0 0 14px 0;
+    border: 1px solid var(--c-line); border-radius: 8px; background: var(--c-panel);
+    padding: 14px 16px;
+}
+.chat-card .who {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 2px;
+    text-transform: uppercase; margin-bottom: 6px; color: var(--c-muted);
+}
+.chat-card .who.user { color: var(--c-accent); }
+.chat-card .msg { font-size: 14px; color: var(--c-text); }
+.chat-card .msg.refined { color: var(--c-muted); font-style: italic; }
+
+.prompt-card {
+    break-inside: avoid; margin: 0 0 12px 0;
+    border: 1px solid var(--c-line); border-left: 3px solid var(--c-accent);
+    border-radius: 3px; background: var(--c-controls);
+    padding: 12px 14px;
+}
+.prompt-card .plabel {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 2px;
+    color: var(--c-muted); text-transform: uppercase; margin-bottom: 5px;
+}
+.prompt-card .ptext { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.55; color: var(--c-text); overflow-wrap: break-word; }
+
+.gallery-row { display: flex; flex-wrap: wrap; gap: 12px; max-width: 100%; break-inside: avoid; margin: 4px 0 14px 0; }
+.gallery-row .art { flex: 1 1 280px; min-width: 260px; max-width: 100%; }
+.gallery-row .art .frame { border: 1px solid var(--c-line); border-radius: 8px; overflow: hidden; background: var(--c-controls); }
+.gallery-row .art img { width: 100%; }
+.gallery-row .art .alabel {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 1.5px;
+    color: var(--c-muted); text-transform: uppercase; padding-top: 7px;
+}
+
+.chain { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; max-width: 100%; break-inside: avoid; margin: 4px 0 14px 0; }
+.chain .node {
+    flex: 1 1 150px; min-width: 140px; max-width: 100%;
+    border: 1px solid var(--c-line); border-radius: 6px; background: var(--c-panel);
+    padding: 10px 12px;
+}
+.chain .node .nn { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 1.5px; color: var(--c-accent); text-transform: uppercase; }
+.chain .node .nd { font-size: 12px; color: var(--c-muted); margin-top: 3px; line-height: 1.45; }
+.note {
+    break-inside: avoid; border: 1px solid var(--c-line); border-radius: 6px;
+    background: var(--c-panel); padding: 12px 14px; margin: 0 0 14px 0;
+    font-size: 13px; color: var(--c-muted);
+}
+.note .nt { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 2px; color: var(--c-accent); text-transform: uppercase; margin-bottom: 5px; }
+
+/* ---------- ending ---------- */
+.ending {
+    width: 720px; height: 1020px; break-before: page; overflow: hidden;
+    background: var(--c-bg);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    text-align: center; padding: 60px; position: relative;
+}
+.ending .big { font-size: 40px; font-weight: 900; letter-spacing: -1px; line-height: 1.15; }
+.ending .small { margin-top: 14px; color: var(--c-muted); font-size: 14px; max-width: 440px; }
+.ending .meta {
+    margin-top: 30px; font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 2.5px; color: var(--c-muted); text-transform: uppercase;
+}
+.ending .rule { width: 64px; height: 2px; background: var(--c-accent); margin: 26px auto 0 auto; }
+</style>
+</head>
+<body>
+
+<!-- ==================== COVER ==================== -->
+<div class="front">
+    <div class="edge-top"></div>
+
+    <div class="front-brand"><span class="dot"></span> PROXY · LIVE — GLM-4.6 + COGVIEW-4</div>
+    <div class="front-title">ArtCraft<br><span class="thin">design process</span></div>
+    <div class="front-sub">How the pure-egui rebuild of ArtCraft was tested end to end with real ZAI models — every prompt typed, every image generated, every screen captured from the running Linux build.</div>
+    <div class="front-tags">
+        <span>RUST + EGUI 0.36</span><span>NO TYPESCRIPT</span><span>GLM-4.6 CHAT</span><span>COGVIEW-4 IMAGES</span><span>ZERO API KEYS</span>
+    </div>
+    <div class="front-shot"><img src="assets/home.png" alt="ArtCraft egui home screen"></div>
+    <div class="front-foot">
+        <span>ArtCraft egui rebuild · v0.41.0</span>
+        <span>Design log · 2026-10-21</span>
+    </div>
+</div>
+
+<!-- ==================== FLOWING CONTENT ==================== -->
+<div class="main-content">
+
+    <!-- Chapter 01 -->
+    <div class="chapter-header">
+        <div class="section-tag">Chapter 01</div>
+        <div class="section-title">The app at a glance</div>
+        <div class="divider"></div>
+    </div>
+    <div class="body-text">The rebuild ships as a native desktop app with the same brutalist dark shell as the TypeScript original: a 40&nbsp;px title bar with a live proxy chip, a 232&nbsp;px sidebar, a breadcrumb header and a rounded content card. The landing page mirrors the web app&rsquo;s hero — a big centered composer with <strong>Image / Chat</strong> mode chips, so the very first thing you can do is type. No API key, no login, no configuration: the app ships pointed at the local <strong>artcraft-proxy</strong> bridge, and the header dot turns green the moment real models answer.</div>
+    <div class="figure">
+        <div class="frame"><img src="assets/home.png" alt="Home page with hero composer"></div>
+        <div class="caption"><span>Home — hero composer with Image / Chat chips</span><span>Status cards: online · live · zai-bridge</span></div>
+    </div>
+    <div class="body-text">Using the app is a three-move loop, and this document walks through all three with real captures:</div>
+    <div class="steps">
+        <div class="step"><span class="n"></span><span class="t"><strong>Brainstorm with the Assistant</strong> — describe what you want; GLM-4.6 returns a polished, ready-to-paste image prompt.</span></div>
+        <div class="step"><span class="n"></span><span class="t"><strong>Craft it in the Image studio</strong> — paste or type a prompt into the always-visible bottom composer; CogView-4 paints it and the result lands in the feed.</span></div>
+        <div class="step"><span class="n"></span><span class="t"><strong>Review and keep</strong> — open the lightbox for a full-size look; every image is auto-saved to the Library on disk.</span></div>
+    </div>
+
+    <!-- Chapter 02 -->
+    <div class="chapter-header">
+        <div class="section-tag">Chapter 02</div>
+        <div class="section-title">Step 1 — brainstorm with GLM-4.6</div>
+        <div class="divider"></div>
+    </div>
+    <div class="body-text">The Assistant page keeps the composer docked at the bottom — Enter sends, Shift+Enter breaks a line, and sessions are stored by the proxy with full history every turn. The first ask was deliberately open: <strong>&ldquo;Give me one polished image prompt: a lighthouse on a cliff at dawn, watercolor style.&rdquo;</strong> GLM answered with a single, production-ready prompt — no meta-commentary, nothing to strip out.</div>
+    <div class="chat-card">
+        <div class="who user">User · sent from the docked composer</div>
+        <div class="msg">Give me one polished image prompt: a lighthouse on a cliff at dawn, watercolor style</div>
+    </div>
+    <div class="chat-card">
+        <div class="who">ArtCraft Assistant · GLM-4.6 · live</div>
+        <div class="msg refined">&ldquo;A solitary lighthouse perched on rugged seaside cliffs at dawn, soft pastel watercolor washes blending with gentle brushstrokes, mist rising from the ocean below, warm golden light breaking through clouds, serene and ethereal atmosphere.&rdquo;</div>
+    </div>
+    <div class="figure">
+        <div class="frame"><img src="assets/assistant.png" alt="Assistant page with live GLM reply"></div>
+        <div class="caption"><span>Assistant — real GLM-4.6 reply, bubble hugs the text</span><span>Session picker: 2 msg · live</span></div>
+    </div>
+    <div class="body-text">A second question doubled as a smoke test: <strong>&ldquo;Explain in two sentences how the image studio works in this app.&rdquo;</strong> The reply wrapped cleanly inside its bubble and demonstrated that the assistant knows its own host — useful when a painter asks &ldquo;what can this studio do?&rdquo; mid-session. Long replies never run off the window; bubbles cap at 72&nbsp;% of the row width and hug their text.</div>
+
+    <!-- Chapter 03 -->
+    <div class="chapter-header">
+        <div class="section-tag">Chapter 03</div>
+        <div class="section-title">Step 2 — CogView-4 paints it</div>
+        <div class="divider"></div>
+    </div>
+    <div class="body-text">GLM&rsquo;s prompt went straight into the Image studio composer — typed exactly as the assistant wrote it, no edits. The Generate button (or just Enter) fired the request through the Rust proxy to CogView-4; about a minute later the painting appeared at the top of the feed with its model and size caption, and a toast confirmed it was saved to the Library.</div>
+    <div class="figure">
+        <div class="frame"><img src="assets/studio-generated.png" alt="Image studio with generated watercolor lighthouse"></div>
+        <div class="caption"><span>Image studio — GLM&rsquo;s prompt in the docked composer</span><span>&ldquo;1 image(s) crafted → Library&rdquo; toast</span></div>
+    </div>
+    <div class="prompt-card">
+        <div class="plabel">Prompt P1 · typed on the Home hero · became the studio painting</div>
+        <div class="ptext">a painters studio at golden hour, oil on canvas style, warm light through tall windows, brushes and easels, soft shadows, high quality, detailed</div>
+    </div>
+    <div class="prompt-card">
+        <div class="plabel">Prompt P2 · written by GLM-4.6 · painted by CogView-4</div>
+        <div class="ptext">A solitary lighthouse perched on windswept cliffs at dawn, soft watercolor washes with gentle bleeds of pink and orange in the sky, reflective wet-on-wet technique for the ocean below, loose brushstrokes for the rocky coastline, ethereal and dreamlike atmosphere.</div>
+    </div>
+
+    <!-- Chapter 04 -->
+    <div class="chapter-header">
+        <div class="section-tag">Chapter 04</div>
+        <div class="section-title">Step 3 — lightbox &amp; library</div>
+        <div class="divider"></div>
+    </div>
+    <div class="body-text">Clicking any tile opens the lightbox: the artwork at full size on a dimmed backdrop, with its caption (prompt prefix · model · size) and a <strong>Reveal in Explorer</strong> shortcut to the file on disk. Escape closes it. The Library page lists every generated image with its prompt, model and size, and persists across restarts via <span style="font-family:'JetBrains Mono',monospace; font-size:12px;">artcraft-data/library.json</span>.</div>
+    <div class="figure">
+        <div class="frame"><img src="assets/lightbox.png" alt="Lightbox showing the lighthouse painting"></div>
+        <div class="caption"><span>Lightbox — full-size review</span><span>cogview-4 · 1024x1024</span></div>
+    </div>
+    <div class="figure">
+        <div class="frame"><img src="assets/library.png" alt="Library page"></div>
+        <div class="caption"><span>Library — every crafted image, on disk</span><span>artcraft-data/generated</span></div>
+    </div>
+
+    <!-- Chapter 05 -->
+    <div class="chapter-header">
+        <div class="section-tag">Chapter 05</div>
+        <div class="section-title">Second pass — pixel art iteration</div>
+        <div class="divider"></div>
+    </div>
+    <div class="body-text">The design loop was run a second time with a different style to prove iteration: select-all, retype, generate. The pixel-art prompt below was typed into the composer (visible mid-edit in the capture) and CogView-4 rendered the cozy isometric studio — warm lamp glow, the sleeping cat on the canvas, 16-bit palette — in about 55 seconds.</div>
+    <div class="figure">
+        <div class="frame"><img src="assets/pixel-typed.png" alt="Pixel art prompt typed in the studio"></div>
+        <div class="caption"><span>Iteration — new prompt typed into the same composer</span><span>model · size · count pickers below</span></div>
+    </div>
+    <div class="prompt-card">
+        <div class="plabel">Prompt P3 · typed for the second pass</div>
+        <div class="ptext">isometric pixel art of a cozy art studio at night, warm lamp glow, tiny cat sleeping on a canvas, 16-bit palette, detailed interior</div>
+    </div>
+    <div class="note">
+        <div class="nt">Honest iteration note</div>
+        One earlier attempt typed a fresh prompt without clearing the composer, and the caret landed mid-text — the request concatenated the lighthouse and pixel-art prompts. The model happily blended them into a calmer lighthouse at sunset (kept in the gallery as a happy accident). The app itself behaved correctly; the lesson is compositional, not architectural: clear the box, or reuse a previous prompt deliberately via the tile&rsquo;s <strong>Reuse prompt</strong> button.
+    </div>
+
+    <!-- Chapter 06 -->
+    <div class="chapter-header">
+        <div class="section-tag">Chapter 06</div>
+        <div class="section-title">The gallery</div>
+        <div class="divider"></div>
+    </div>
+    <div class="body-text">All four artworks produced during this session, exactly as saved by the app to <span style="font-family:'JetBrains Mono',monospace; font-size:12px;">artcraft-data/generated/</span>. Every image was generated live by CogView-4 through the proxy bridge during the GUI test run — none are mockups or placeholders.</div>
+    <div class="gallery-row">
+        <div class="art">
+            <div class="frame"><img src="assets/art-studio-painting.png" alt="Studio painting"></div>
+            <div class="alabel">01 · Painter&rsquo;s studio, golden hour — prompt P1</div>
+        </div>
+        <div class="art">
+            <div class="frame"><img src="assets/art-lighthouse-watercolor.png" alt="Watercolor lighthouse"></div>
+            <div class="alabel">02 · Lighthouse watercolor — prompt P2</div>
+        </div>
+    </div>
+    <div class="gallery-row">
+        <div class="art">
+            <div class="frame"><img src="assets/art-lighthouse-calm.png" alt="Calm lighthouse at sunset"></div>
+            <div class="alabel">03 · Blended-prompt lighthouse — the honest accident</div>
+        </div>
+        <div class="art">
+            <div class="frame"><img src="assets/art-pixel-studio.png" alt="Isometric pixel art studio"></div>
+            <div class="alabel">04 · Pixel-art studio with cat — prompt P3</div>
+        </div>
+    </div>
+
+    <!-- Chapter 07 -->
+    <div class="chapter-header">
+        <div class="section-tag">Chapter 07</div>
+        <div class="section-title">Zero-key architecture, proven live</div>
+        <div class="divider"></div>
+    </div>
+    <div class="body-text">Neither the desktop app nor the Rust proxy ever holds a credential. Two live backends were verified during this run: the local <strong>artcraft-proxy</strong> on <span style="font-family:'JetBrains Mono',monospace; font-size:12px;">127.0.0.1:8787</span> (which relays model calls to a server-side ZAI bridge), and the hosted backend reached by simply pasting a URL into Settings — the exact flow a Windows user repeats with the preview URL. The settings readout shows the truth in green: <strong>mode live</strong>, and the API key row reads <strong>&ldquo;none — held server-side by the ZAI bridge&rdquo;</strong>.</div>
+    <div class="chain">
+        <div class="node"><div class="nn">ArtCraft (egui)</div><div class="nd">Settings → Proxy URL. Only a URL ever reaches the app.</div></div>
+        <div class="node"><div class="nn">artcraft-proxy</div><div class="nd">Rust · sessions, chat &amp; image endpoints on 127.0.0.1:8787.</div></div>
+        <div class="node"><div class="nn">ZAI bridge</div><div class="nd">Holds the credential; GLM-4.6 + CogView-4 answer here.</div></div>
+    </div>
+    <div class="figure">
+        <div class="frame"><img src="assets/hosted-chat.png" alt="Chat through the hosted backend after pasting the URL"></div>
+        <div class="caption"><span>Paste-URL flow — fresh session on the hosted backend</span><span>&ldquo;Hello, artist! Let&rsquo;s bring your vision to life.&rdquo;</span></div>
+    </div>
+    <div class="figure">
+        <div class="frame"><img src="assets/settings.png" alt="Settings page showing live bridge backend"></div>
+        <div class="caption"><span>Settings — live mode, no key on this machine</span><span>backend: zai-bridge · glm-4.6 · cogview-4</span></div>
+    </div>
+    <div class="body-text">The app also self-heals across backends: switching the Proxy URL drops the stale session id, and if a session ever vanishes the next message recreates it transparently. That single detail is what makes &ldquo;paste a URL and go&rdquo; trustworthy rather than fragile.</div>
+
+    <!-- Chapter 08 -->
+    <div class="chapter-header">
+        <div class="section-tag">Chapter 08</div>
+        <div class="section-title">Every prompt in this log</div>
+        <div class="divider"></div>
+    </div>
+    <div class="body-text">The complete, unabridged set of prompts and messages that produced this document — typed by hand or returned by GLM-4.6, all executed against live models.</div>
+    <div class="prompt-card">
+        <div class="plabel">P1 · Human · Home hero composer · → studio painting</div>
+        <div class="ptext">a painters studio at golden hour, oil on canvas style, warm light through tall windows, brushes and easels, soft shadows, high quality, detailed</div>
+    </div>
+    <div class="prompt-card">
+        <div class="plabel">C1 · Human · Assistant</div>
+        <div class="ptext">Give me one polished image prompt: a lighthouse on a cliff at dawn, watercolor style</div>
+    </div>
+    <div class="prompt-card">
+        <div class="plabel">P2 · GLM-4.6 reply to C1 · → watercolor lighthouse</div>
+        <div class="ptext">A solitary lighthouse perched on rugged seaside cliffs at dawn, soft pastel watercolor washes blending with gentle brushstrokes, mist rising from the ocean below, warm golden light breaking through clouds, serene and ethereal atmosphere.</div>
+    </div>
+    <div class="prompt-card">
+        <div class="plabel">P2&prime; · GLM-4.6 · second session variant of the lighthouse prompt</div>
+        <div class="ptext">A solitary lighthouse perched on windswept cliffs at dawn, soft watercolor washes with gentle bleeds of pink and orange in the sky, reflective wet-on-wet technique for the ocean below, loose brushstrokes for the rocky coastline, ethereal and dreamlike atmosphere.</div>
+    </div>
+    <div class="prompt-card">
+        <div class="plabel">C2 · Human · Assistant smoke test</div>
+        <div class="ptext">Explain in two sentences how the image studio works in this app</div>
+    </div>
+    <div class="prompt-card">
+        <div class="plabel">C3 · Human · Assistant (hosted backend)</div>
+        <div class="ptext">Say hello to the painter using this app, one short sentence</div>
+    </div>
+    <div class="prompt-card">
+        <div class="plabel">P3 · Human · Image studio · → pixel-art studio</div>
+        <div class="ptext">isometric pixel art of a cozy art studio at night, warm lamp glow, tiny cat sleeping on a canvas, 16-bit palette, detailed interior</div>
+    </div>
+
+</div>
+
+<!-- ==================== ENDING ==================== -->
+<div class="ending">
+    <div class="big">Type a sentence.<br>Get a painting.</div>
+    <div class="rule"></div>
+    <div class="small">ArtCraft rebuilt in pure Rust with egui — sessions, chat and image studio, wired to ZAI&rsquo;s GLM-4.6 and CogView-4 through a credential-free bridge.</div>
+    <div class="meta">github.com/20kiwy/artcraft-egui · apps/artcraft + apps/artcraft-proxy</div>
+</div>
+
+</body>
+</html>

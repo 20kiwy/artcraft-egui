@@ -15,20 +15,30 @@ pub struct ZaiClient {
   http: reqwest::Client,
   base: String,
   key: Option<String>,
+  /// Server-side bridge base URL (e.g. the sandbox's Next.js). When set and
+  /// no API key is configured, real models answer through it and neither the
+  /// proxy nor the desktop app ever touches a credential.
+  bridge: Option<String>,
 }
 
 impl ZaiClient {
   pub fn new(settings: &Settings) -> Self {
     let http = reqwest::Client::builder()
-      .timeout(std::time::Duration::from_secs(180))
+      .timeout(std::time::Duration::from_secs(300))
       .user_agent(concat!("artcraft-proxy/", env!("CARGO_PKG_VERSION")))
       .build()
       .expect("reqwest client");
-    Self { http, base: settings.zai_base_url.clone(), key: settings.api_key.clone() }
+    Self { http, base: settings.zai_base_url.clone(), key: settings.api_key.clone(), bridge: settings.bridge_url.clone() }
   }
 
   /// Chat completion → the full upstream JSON (choices[0].message.content).
+  /// With no key but a configured bridge, the bridge answers with real GLM.
   pub async fn chat_completion(&self, model: &str, messages: &[Value]) -> Result<Value> {
+    if self.key.is_none() {
+      if let Some(bridge) = &self.bridge {
+        return self.bridge_chat(bridge, model, messages).await;
+      }
+    }
     let key = self.key.as_deref().context("ZAI_API_KEY is not configured")?;
     let url = format!("{}/chat/completions", self.base);
     let resp = self
@@ -49,8 +59,14 @@ impl ZaiClient {
   }
 
   /// Image generation → raw image bytes + mime type (URLs are downloaded here
-  /// so the desktop app only ever sees base64 data).
+  /// so the desktop app only ever sees base64 data). With no key but a
+  /// configured bridge, the bridge answers with real CogView.
   pub async fn generate_image(&self, model: &str, prompt: &str, size: &str) -> Result<(Vec<u8>, String)> {
+    if self.key.is_none() {
+      if let Some(bridge) = &self.bridge {
+        return self.bridge_image(bridge, model, prompt, size).await;
+      }
+    }
     let key = self.key.as_deref().context("ZAI_API_KEY is not configured")?;
     let url = format!("{}/images/generations", self.base);
     let resp = self
@@ -91,6 +107,59 @@ impl ZaiClient {
       return Ok((bytes.to_vec(), mime));
     }
     bail!("ZAI image response had neither b64_json nor url");
+  }
+
+  // -------------------------------------------------------------- bridge ---
+
+  /// Chat through the server-side bridge: `POST {bridge}/api/zai/chat`
+  /// `{messages, model}` → `{content}`. The response is reshaped into the
+  /// OpenAI-compatible form the routes layer expects.
+  async fn bridge_chat(&self, bridge: &str, model: &str, messages: &[Value]) -> Result<Value> {
+    let resp = self
+      .http
+      .post(format!("{bridge}/api/zai/chat"))
+      .json(&json!({ "model": model, "messages": messages }))
+      .send()
+      .await
+      .context("ZAI bridge chat request failed")?;
+    let status = resp.status();
+    let body: Value = resp.json().await.context("ZAI bridge chat response was not JSON")?;
+    if !status.is_success() {
+      let msg = body["error"].as_str().unwrap_or("the ZAI bridge rejected the chat request");
+      bail!("ZAI bridge chat error {status}: {msg}");
+    }
+    let content = body["content"].as_str().unwrap_or_default().to_owned();
+    Ok(json!({
+      "choices": [{ "message": { "role": "assistant", "content": content } }],
+      "model": body["model"].as_str().unwrap_or(model),
+      "bridge": true,
+    }))
+  }
+
+  /// Images through the server-side bridge: `POST {bridge}/api/zai/image`
+  /// `{prompt, size, model}` → `{image_base64, mime}`.
+  async fn bridge_image(&self, bridge: &str, model: &str, prompt: &str, size: &str) -> Result<(Vec<u8>, String)> {
+    let resp = self
+      .http
+      .post(format!("{bridge}/api/zai/image"))
+      .json(&json!({ "model": model, "prompt": prompt, "size": size }))
+      .send()
+      .await
+      .context("ZAI bridge image request failed")?;
+    let status = resp.status();
+    let body: Value = resp.json().await.context("ZAI bridge image response was not JSON")?;
+    if !status.is_success() {
+      let msg = body["error"].as_str().unwrap_or("the ZAI bridge rejected the image request");
+      bail!("ZAI bridge image error {status}: {msg}");
+    }
+    let b64 = body["image_base64"]
+      .as_str()
+      .ok_or_else(|| anyhow::anyhow!("ZAI bridge image response contained no image_base64"))?;
+    let bytes = base64::engine::general_purpose::STANDARD
+      .decode(b64.trim())
+      .context("decode ZAI bridge base64 image")?;
+    let mime = body["mime"].as_str().unwrap_or("image/png").to_owned();
+    Ok((bytes, mime))
   }
 
   /// Raw passthrough for power users: `{method} {base}{path}` with the plugin
