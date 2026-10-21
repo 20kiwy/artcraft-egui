@@ -1,17 +1,24 @@
 /**
- * Catch-all bridge: preview URL → local artcraft-proxy.
+ * Catch-all bridge: preview URL → hosted ZAI API (or local artcraft-proxy).
  *
- * Forwards every method under /api/v1/* to the artcraft-proxy listening on
- * 127.0.0.1:8787, preserving method, headers, query string and body, and
- * streams the upstream response back (works for the OpenAI-compatible
- * streaming passthrough at /api/v1/openai/* too).
+ * The egui desktop app speaks the artcraft-proxy API contract. Requests under
+ * /api/v1/* are served in priority order:
  *
- * With this route the egui desktop app can use the public preview URL as its
- * proxy URL (Settings → Proxy URL), because the sandbox gateway only exposes
- * port 3000.
+ *   1. Hosted backend (src/lib/artcraft-hosted.ts) — GLM chat + CogView-style
+ *      image generation via z-ai-web-dev-sdk with server-side credentials.
+ *      This is the zero-config path: paste the preview URL in the app and AI
+ *      just works, no API key.
+ *
+ *   2. Rust artcraft-proxy child (127.0.0.1:8787, see
+ *      src/lib/artcraft-proxy-child.ts) — fallback for anything the hosted
+ *      backend does not own, e.g. the raw /api/v1/openai/* passthrough.
+ *
+ * Method, query string and body are preserved; responses stream back.
  */
 
 import { NextRequest } from 'next/server';
+
+import { handleHostedApi } from '@/lib/artcraft-hosted';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,7 +48,19 @@ function relayHeaders(headers: Headers): Headers {
 async function forward(req: NextRequest, ctx: { params: Promise<{ path?: string[] }> }) {
   const { path = [] } = await ctx.params;
 
-  // Rebuild the upstream path from the decoded catch-all segments.
+  // --- 1. hosted ZAI backend (server-side credentials) ---
+  let parsedBody: unknown = null;
+  if (!['GET', 'HEAD'].includes(req.method)) {
+    try {
+      parsedBody = await req.json();
+    } catch {
+      parsedBody = null;
+    }
+  }
+  const hosted = await handleHostedApi(req.method, path, parsedBody);
+  if (hosted) return hosted;
+
+  // --- 2. fall back to the Rust artcraft-proxy child ---
   const suffix = path.map(encodeURIComponent).join('/');
   const target = `${PROXY_ORIGIN}/api/v1${suffix ? `/${suffix}` : ''}${req.nextUrl.search}`;
 
@@ -63,7 +82,7 @@ async function forward(req: NextRequest, ctx: { params: Promise<{ path?: string[
     return Response.json(
       {
         ok: false,
-        error: `artcraft-proxy unreachable at ${PROXY_ORIGIN} — start it with: cargo run -p artcraft-proxy`,
+        error: `no backend for /api/v1/${path.join('/')} — hosted backend declined and artcraft-proxy is unreachable at ${PROXY_ORIGIN}`,
       },
       { status: 502 },
     );

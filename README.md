@@ -99,7 +99,7 @@ The hosted sandbox only exposes port 3000, so the Next.js app bridges the proxy 
 - `src/instrumentation.ts` + `src/lib/artcraft-proxy-child.ts` spawn `artcraft-proxy` as a **child of the Next.js server** (watchdog respawns it every 5 s if it exits).
 - `src/app/health/route.ts` and `src/app/api/v1/[...path]/route.ts` relay `/health` + `/api/v1/*` to `127.0.0.1:8787` (method/query/body preserved, streaming pass-through).
 
-Result: paste the **preview URL** (the HTTPS URL from the preview panel / "Open in New Tab", no trailing slash needed) into the egui app's **Settings → Proxy URL** and the hosted proxy answers — mock mode unless a `ZAI_API_KEY` is set in the sandbox environment. The override origin can be changed with `ARTCRAFT_PROXY_ORIGIN`.
+Result: paste the **preview URL** (the HTTPS URL from the preview panel / "Open in New Tab", no trailing slash needed) into the egui app's **Settings → Proxy URL** and AI just works — **no API key in the app, ever**. The hosted bridge (`src/lib/artcraft-hosted.ts`) serves the same artcraft-proxy API contract but powers it with `z-ai-web-dev-sdk` server-side (GLM chat + image generation), so the app's titlebar chip flips to **PROXY · LIVE**. Sessions persist to `data/bridge-sessions.json`; `/api/v1/openai/*` still falls through to the Rust proxy child (`ARTCRAFT_PROXY_ORIGIN` overrides it). A demo art session — every prompt + artwork compiled into one document — ships at `public/artcraft-art-session.pdf` (preview URL → `/artcraft-art-session.pdf`), with the raw pieces in `public/artcraft-gallery/`.
 
 ## The proxy API
 
