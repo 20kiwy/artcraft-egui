@@ -1,0 +1,60 @@
+[
+  {
+    "id": "c1115327-6149-4809-a4e3-551f542ea6b3",
+    "title": "Give me one polished image prompt for a cyberpu…",
+    "created_at": 1792583456,
+    "updated_at": 1792583905,
+    "messages": [
+      {
+        "role": "user",
+        "content": "Give me one polished image prompt for a cyberpunk fox poster, ready to paste",
+        "ts": 1792583485
+      },
+      {
+        "role": "assistant",
+        "content": "\"A sleek cyberpunk fox with neon blue and purple fur, augmented with glowing cybernetic implants, standing atop a rain-slicked neon-drenched street in a futuristic metropolis, holographic advertisements flickering in the background, cinematic lighting, detailed digital art style, poster format, high contrast, vibrant neon colors, atmospheric fog, 8k resolution.\"",
+        "ts": 1792583486
+      },
+      {
+        "role": "user",
+        "content": "Polish this into ONE image prompt. Reply with ONLY the prompt text, no quotes, no commentary: a cyberpunk fox in neon rain, poster art",
+        "ts": 1792583700
+      },
+      {
+        "role": "assistant",
+        "content": "A sleek cyberpunk fox with glowing neon fur and cybernetic implants standing in a rain-soaked neon-lit alley, holographic advertisements reflecting on wet pavement, cinematic lighting, detailed poster art style, vibrant purple and blue neon colors, high contrast, atmospheric fog, 8k resolution, digital masterpiece.",
+        "ts": 1792583701
+      },
+      {
+        "role": "user",
+        "content": "Polish this into ONE image prompt. Reply with ONLY the prompt text, no quotes, no commentary: a serene mountain landscape at dawn, watercolor",
+        "ts": 1792583772
+      },
+      {
+        "role": "assistant",
+        "content": "\nSerene mountain landscape at dawn with soft pastel hues, misty valleys, and reflective lake in foreground, delicate watercolor washes with visible brushstrokes, gentle morning light, peaceful atmosphere, dreamy composition, muted color palette with subtle highlights, textured watercolor paper background, artistic impression style, ethereal beauty.",
+        "ts": 1792583773
+      },
+      {
+        "role": "user",
+        "content": "Polish this into ONE image prompt. Reply with ONLY the prompt text, no quotes, no commentary: portrait of a stoic desert ranger, concept art",
+        "ts": 1792583843
+      },
+      {
+        "role": "assistant",
+        "content": "\nWeathered desert ranger with sun-beaten skin and intense gaze, wearing practical leather and cloth gear with desert survival tools, standing amidst sand dunes under harsh midday sun, detailed concept art style, dramatic lighting with long shadows, muted earth tones with warm highlights, cinematic composition, intricate textures, digital painting, character design masterpiece.",
+        "ts": 1792583844
+      },
+      {
+        "role": "user",
+        "content": "Polish this into ONE image prompt. Reply with ONLY the prompt text, no quotes, no commentary: a cozy isometric artist studio full of plants, warm light",
+        "ts": 1792583903
+      },
+      {
+        "role": "assistant",
+        "content": "\nIsometric view of a cozy artist studio filled with lush green plants and hanging vines, warm golden light streaming through large windows, wooden workbench with art supplies and half-finished paintings, shelves lined with books and ceramics, comfortable reading nook with soft cushions, detailed interior design, soft shadows, vibrant yet harmonious color palette, digital illustration, meticulous details, inviting atmosphere.",
+        "ts": 1792583905
+      }
+    ]
+  }
+]
