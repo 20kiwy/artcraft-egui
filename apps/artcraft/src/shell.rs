@@ -10,6 +10,16 @@ pub const HEADER_HEIGHT: f32 = 48.0;
 pub const PANEL_GAP: i8 = 8;
 pub const PANEL_RADIUS: u8 = 8;
 
+/// Responsive floor: the smallest logical (scale-independent) viewport the
+/// layout needs so the title bar, page header and the docked composer (text
+/// area) always fit. On high-DPI/small displays the app eases its UI scale
+/// down towards this floor instead of letting the composer fall off-window.
+pub const MIN_LOGICAL_HEIGHT: f32 = 540.0;
+pub const MIN_LOGICAL_WIDTH: f32 = 860.0;
+/// Below this logical height the pages switch to compact composers
+/// (2 rows instead of 3) to keep feed space comfortable.
+pub const COMPACT_BELOW: f32 = 640.0;
+
 /// Every page in the rebuild's navigation. The upstream remakes more tools
 /// (video, audio, 3D…); this rebuild ships the ones the ZAI plugin serves.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

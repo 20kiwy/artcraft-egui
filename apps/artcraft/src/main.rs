@@ -19,11 +19,18 @@ const APP_ID: &str = "ai.artcraft.egui";
 
 fn main() -> eframe::Result {
   env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+  // 840x540 min: small laptop screens at high OS scaling still fit
+  // (the in-app scale guard in app.rs keeps the logical viewport usable).
   let mut viewport = egui::ViewportBuilder::default()
     .with_title("ArtCraft")
     .with_app_id(APP_ID)
     .with_inner_size([1440.0, 900.0])
-    .with_min_inner_size([960.0, 640.0]);
+    .with_min_inner_size([840.0, 540.0]);
+  // Test/dev hooks (no CLI needed): ARTCRAFT_WIN=1366x768 overrides the
+  // initial window size, ARTCRAFT_PPP=1.5 forces a UI scale.
+  if let Some((w, h)) = std::env::var("ARTCRAFT_WIN").ok().and_then(parse_size) {
+    viewport = viewport.with_inner_size([w, h]).with_min_inner_size([360.0, 320.0]);
+  }
   if let Some(icon) = app_icon() {
     viewport = viewport.with_icon(icon);
   }
@@ -31,6 +38,11 @@ fn main() -> eframe::Result {
   viewport = viewport.with_decorations(false);
   let options = eframe::NativeOptions { viewport, persist_window: true, ..Default::default() };
   eframe::run_native("ArtCraft", options, Box::new(|cc| Ok(Box::new(app::ArtcraftApp::new(cc)))))
+}
+
+fn parse_size(s: String) -> Option<(f32, f32)> {
+  let (w, h) = s.split_once(['x', 'X', '*'])?;
+  Some((w.trim().parse().ok()?, h.trim().parse().ok()?))
 }
 
 /// A generative "A" mark (accent triangle + ink crossbar) so we ship no

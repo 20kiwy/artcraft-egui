@@ -22,9 +22,10 @@ impl ArtcraftApp {
       .frame(egui::Frame::NONE.outer_margin(Margin::same(8)))
       .show(ui, |ui| {
         widgets::prompt_box(ui, |ui| {
+          let rows = if self.compact_screen(ctx) { 2 } else { 3 };
           let resp = egui::TextEdit::multiline(&mut self.img_prompt)
             .hint_text("Describe the image you want to craft…  (Enter to generate, Shift+Enter for a new line)")
-            .desired_rows(3)
+            .desired_rows(rows)
             .desired_width(ui.available_width())
             .frame(egui::Frame::NONE)
             .font(FontId::new(15.0, theme::medium()))

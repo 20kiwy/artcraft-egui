@@ -108,6 +108,13 @@ pub struct Toast {
 impl ArtcraftApp {
   pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
     theme::apply(&cc.egui_ctx);
+    // Dev/test scale override (also lets users on exotic DPI setups force a
+    // comfortable size): ARTCRAFT_PPP=1.25 / 1.5 / 1 …
+    if let Some(p) = std::env::var("ARTCRAFT_PPP").ok().and_then(|v| v.parse::<f32>().ok()) {
+      if (0.5..=4.0).contains(&p) {
+        cc.egui_ctx.set_pixels_per_point(p);
+      }
+    }
     let (tx, rx) = channel();
     let settings = Settings::load();
     let client = std::sync::Arc::new(ProxyClient::new(&settings.proxy_url));
@@ -292,6 +299,38 @@ impl ArtcraftApp {
     }
   }
 
+  /// Responsive scale guard. A Windows/Linux display scaled at 125–150 % can
+  /// shrink the *logical* viewport below what the layout needs (title bar +
+  /// header + docked composer ≈ 540 pt), which used to push the composer's
+  /// text area off-window. If the OS scale would do that, ease the UI scale
+  /// down so the whole page — text area included — stays visible.
+  fn fit_scaling(&self, ctx: &egui::Context) {
+    if std::env::var_os("ARTCRAFT_PPP").is_some() {
+      return; // manual override wins
+    }
+    let native = ctx.native_pixels_per_point().unwrap_or(1.0);
+    let ppp = ctx.pixels_per_point();
+    let screen = ctx.content_rect();
+    if screen.is_negative() {
+      return; // first frame, no size yet
+    }
+    let phys_h = screen.height() * ppp;
+    let phys_w = screen.width() * ppp;
+    let target = (phys_h / shell::MIN_LOGICAL_HEIGHT)
+      .min(phys_w / shell::MIN_LOGICAL_WIDTH)
+      .min(native)
+      .clamp(0.75, 4.0);
+    if (target - ppp).abs() > 0.02 {
+      ctx.set_pixels_per_point(target);
+    }
+  }
+
+  /// True when the logical viewport is short enough that composers should
+  /// drop to 2 rows (keeps the feeds comfortable on small windows).
+  pub(crate) fn compact_screen(&self, ctx: &egui::Context) -> bool {
+    ctx.content_rect().height() < shell::COMPACT_BELOW
+  }
+
   // ------------------------------------------------------------ actions ---
 
   pub(crate) fn apply_proxy_url(&mut self, url: &str) {
@@ -433,9 +472,13 @@ impl ArtcraftApp {
           ui.add_space(6.0);
         }
         ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
-          ui.add_space(12.0);
-          widgets::hud(ui, concat!("egui rebuild · v", env!("CARGO_PKG_VERSION")), theme::FAINT);
-          widgets::hud(ui, "upstream: storytold/artcraft", theme::FAINT);
+          // On very short windows the footer HUD would collide with the nav
+          // rows — drop it, navigation wins.
+          if ui.input(|i| i.content_rect().height()) >= 460.0 {
+            ui.add_space(12.0);
+            widgets::hud(ui, concat!("egui rebuild · v", env!("CARGO_PKG_VERSION")), theme::FAINT);
+            widgets::hud(ui, "upstream: storytold/artcraft", theme::FAINT);
+          }
         });
       });
   }
@@ -556,6 +599,7 @@ impl ArtcraftApp {
 
 impl eframe::App for ArtcraftApp {
   fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    self.fit_scaling(ctx);
     self.poll_events(ctx);
     self.maybe_health(ctx);
     if let Some(t) = &self.toast {

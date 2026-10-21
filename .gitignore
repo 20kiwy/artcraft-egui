@@ -63,3 +63,4 @@ server.log
 /dev.log
 *.log
 /db/
+/upload/

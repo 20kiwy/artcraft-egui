@@ -52,9 +52,10 @@ impl ArtcraftApp {
             } else {
               ("Ask the ArtCraft Assistant…", 15.5)
             };
+            let rows = if self.compact_screen(ctx) { 2 } else { 3 };
             let resp = egui::TextEdit::multiline(&mut self.home_prompt)
               .hint_text(hint)
-              .desired_rows(3)
+              .desired_rows(rows)
               .desired_width(ui.available_width())
               .frame(egui::Frame::NONE)
               .font(FontId::new(font, theme::medium()))
