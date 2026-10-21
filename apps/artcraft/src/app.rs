@@ -148,6 +148,24 @@ impl ArtcraftApp {
     app.queue_health();
     app.queue_config();
     app.queue_sessions();
+    // Test hooks (dev/CI screenshots): ARTCRAFT_PAGE=home|image|assistant|
+    // library|settings selects the start page, ARTCRAFT_PREFILL=<lines> stuffs
+    // both composers with long multi-line text to verify the capped composer
+    // height. Unset in normal use — zero effect.
+    if let Ok(p) = std::env::var("ARTCRAFT_PAGE") {
+      app.page = match p.as_str() {
+        "image" => Page::CreateImage,
+        "assistant" => Page::Assistant,
+        "library" => Page::Library,
+        "settings" => Page::Settings,
+        _ => Page::Home,
+      };
+    }
+    if let Some(n) = std::env::var("ARTCRAFT_PREFILL").ok().and_then(|v| v.parse::<usize>().ok()) {
+      let filler: String = (0..n).map(|i| format!("line {i:02} · the quick brown fox jumps over the lazy dog 0123456789\n")).collect();
+      app.img_prompt = filler.clone();
+      app.asst.draft = filler;
+    }
     app
   }
 

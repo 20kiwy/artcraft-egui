@@ -23,20 +23,21 @@ impl ArtcraftApp {
       .show(ui, |ui| {
         widgets::prompt_box(ui, |ui| {
           let rows = if self.compact_screen(ctx) { 2 } else { 3 };
-          let resp = egui::TextEdit::multiline(&mut self.img_prompt)
-            .hint_text("Describe the image you want to craft…  (Enter to generate, Shift+Enter for a new line)")
-            .desired_rows(rows)
-            .desired_width(ui.available_width())
-            .frame(egui::Frame::NONE)
-            .font(FontId::new(15.0, theme::medium()))
-            .show(ui);
+          let resp = widgets::capped_multiline(
+            ui,
+            &mut self.img_prompt,
+            "Describe the image you want to craft…  (Enter to generate, Shift+Enter for a new line)",
+            rows,
+            150.0,
+            FontId::new(15.0, theme::medium()),
+          );
           if self.focus_composer {
             self.focus_composer = false;
-            resp.response.request_focus();
+            resp.request_focus();
           }
-          let enter = resp.response.lost_focus()
-            && ui.input(|i| i.key_pressed(egui::Key::Enter))
-            && !ui.input(|i| i.modifiers.shift);
+          // See assistant.rs: multiline Enter-to-fire must use key_pressed + focus.
+          let (enter_pressed, shift) = ui.input(|i| (i.key_pressed(egui::Key::Enter), i.modifiers.shift));
+          let enter = resp.has_focus() && enter_pressed && !shift;
           ui.add_space(6.0);
           ui.horizontal(|ui| {
             // Model picker.

@@ -20,20 +20,23 @@ impl ArtcraftApp {
       .frame(egui::Frame::NONE.outer_margin(Margin::same(8)))
       .show(ui, |ui| {
         widgets::prompt_box(ui, |ui| {
-          let resp = egui::TextEdit::multiline(&mut self.asst.draft)
-            .hint_text("Message ArtCraft Assistant…  (Enter to send, Shift+Enter for a new line)")
-            .desired_rows(2)
-            .desired_width(ui.available_width())
-            .frame(egui::Frame::NONE)
-            .font(FontId::new(14.5, theme::medium()))
-            .show(ui);
+          let resp = widgets::capped_multiline(
+            ui,
+            &mut self.asst.draft,
+            "Message ArtCraft Assistant…  (Enter to send, Shift+Enter for a new line)",
+            2,
+            150.0,
+            FontId::new(14.5, theme::medium()),
+          );
           if self.focus_composer {
             self.focus_composer = false;
-            resp.response.request_focus();
+            resp.request_focus();
           }
-          let enter = resp.response.lost_focus()
-            && ui.input(|i| i.key_pressed(egui::Key::Enter))
-            && !ui.input(|i| i.modifiers.shift);
+          // Multiline TextEdit keeps focus on Enter (it inserts a newline), so
+          // "Enter to send" must be detected as a pressed key while focused —
+          // `lost_focus()` never fires here (that idiom is singleline-only).
+          let (enter_pressed, shift) = ui.input(|i| (i.key_pressed(egui::Key::Enter), i.modifiers.shift));
+          let enter = resp.has_focus() && enter_pressed && !shift;
           ui.add_space(4.0);
           ui.horizontal(|ui| {
             // Session controls sit with the composer, TS-chat style.

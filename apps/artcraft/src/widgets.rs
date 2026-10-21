@@ -122,6 +122,29 @@ pub fn prompt_box(ui: &mut Ui, add: impl FnOnce(&mut Ui)) -> egui::InnerResponse
   Frame::default().fill(theme::CONTROLS).corner_radius(theme::RADIUS).stroke(theme::hairline()).inner_margin(Margin::same(12)).show(ui, add)
 }
 
+/// The multiline text editor docked composers can trust: the box starts at
+/// `rows` lines and grows while typing, but never past `max_height` — beyond
+/// that the text scrolls *inside* the box, so a long pasted prompt can never
+/// stretch the docked composer over the page ("why is its height so big").
+pub fn capped_multiline(ui: &mut Ui, text: &mut String, hint: &str, rows: usize, max_height: f32, font: FontId) -> Response {
+  let mut inner: Option<Response> = None;
+  egui::ScrollArea::vertical()
+    .auto_shrink([false, true])
+    .max_height(max_height)
+    .show(ui, |ui| {
+      let resp = egui::TextEdit::multiline(text)
+        .hint_text(hint)
+        .desired_rows(rows)
+        .desired_width(ui.available_width())
+        .frame(Frame::NONE)
+        .font(font)
+        .show(ui);
+      // egui 0.36: TextEditOutput.response is an AtomLayoutResponse (Deref→Response).
+      inner = Some(resp.response.response.clone());
+    });
+  inner.expect("scroll-area body runs exactly once")
+}
+
 /// Left-aligned mono caption + right-aligned mono value on one row.
 pub fn kv(ui: &mut Ui, key: &str, value: &str, value_color: Color32) {
   ui.horizontal(|ui| {

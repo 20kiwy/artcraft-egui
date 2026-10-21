@@ -53,16 +53,10 @@ impl ArtcraftApp {
               ("Ask the ArtCraft Assistant…", 15.5)
             };
             let rows = if self.compact_screen(ctx) { 2 } else { 3 };
-            let resp = egui::TextEdit::multiline(&mut self.home_prompt)
-              .hint_text(hint)
-              .desired_rows(rows)
-              .desired_width(ui.available_width())
-              .frame(egui::Frame::NONE)
-              .font(FontId::new(font, theme::medium()))
-              .show(ui);
-            let enter = resp.response.lost_focus()
-              && ui.input(|i| i.key_pressed(egui::Key::Enter))
-              && !ui.input(|i| i.modifiers.shift);
+            let resp = widgets::capped_multiline(ui, &mut self.home_prompt, hint, rows, 150.0, FontId::new(font, theme::medium()));
+            // See assistant.rs: multiline Enter-to-fire must use key_pressed + focus.
+            let (enter_pressed, shift) = ui.input(|i| (i.key_pressed(egui::Key::Enter), i.modifiers.shift));
+            let enter = resp.has_focus() && enter_pressed && !shift;
             ui.add_space(6.0);
             ui.horizontal(|ui| {
               widgets::hud(ui, "Enter to launch · options live on the studio pages", theme::FAINT);
